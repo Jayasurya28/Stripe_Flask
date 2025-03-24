@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stripe Payment</title>
+    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .payment-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-container">
+        <h1>Complete Your Purchase</h1>
+        <stripe-buy-button
+            buy-button-id="buy_btn_1R6CwsFtDAQidtXB4OHVoVIC"
+            publishable-key="pk_test_51R6Cl6FtDAQidtXBqGXOTICUbb1Bvbp9M5sgVsYxmYIkox8EpH2WiggUQxZsCFg655KWxGg1sT8BmoZdgww5rmLk00wa2RNpBf"
+        >
+        </stripe-buy-button>
+    </div>
+</body>
+</html>
