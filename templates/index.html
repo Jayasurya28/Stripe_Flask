@@ -2,42 +2,175 @@
 <html>
 <head>
     <title>Stripe Payment</title>
-    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #6366f1, #a855f7);
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
             min-height: 100vh;
             margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 20px;
         }
 
         .payment-container {
             background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 450px;
+            max-width: 95%;
             text-align: center;
-            max-width: 400px;
-            width: 90%;
+        }
+
+        .product-icon {
+            background: #f3f4f6;
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+        }
+
+        .product-icon svg {
+            width: 40px;
+            height: 40px;
+            color: #4f46e5;
         }
 
         h1 {
-            color: #333;
-            margin-bottom: 1.5rem;
+            color: #1f2937;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .price {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4f46e5;
+            margin-bottom: 0.5rem;
+        }
+
+        .description {
+            color: #6b7280;
+            font-size: 0.95rem;
+            margin-bottom: 2rem;
+        }
+
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        button:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .secure-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 2rem;
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
+
+        .secure-badge svg {
+            width: 16px;
+            height: 16px;
         }
     </style>
 </head>
 <body>
     <div class="payment-container">
-        <h1>Complete Your Purchase</h1>
-        <stripe-buy-button
-            buy-button-id="buy_btn_1R6CwsFtDAQidtXB4OHVoVIC"
-            publishable-key="pk_test_51R6Cl6FtDAQidtXBqGXOTICUbb1Bvbp9M5sgVsYxmYIkox8EpH2WiggUQxZsCFg655KWxGg1sT8BmoZdgww5rmLk00wa2RNpBf"
-        >
-        </stripe-buy-button>
+        <div class="product-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+        </div>
+        <h1>Premium Package</h1>
+        <div class="price">$50.00</div>
+        <p class="description">Get access to all premium features and unlimited usage</p>
+        
+        <button id="checkout-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Proceed to Payment
+        </button>
+
+        <div class="secure-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Secured by Stripe
+        </div>
     </div>
+
+    <script>
+        const stripe = Stripe('{{ key }}');
+        const checkoutButton = document.getElementById('checkout-button');
+
+        checkoutButton.addEventListener('click', async () => {
+            checkoutButton.disabled = true;
+            try {
+                const response = await fetch('/pay', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const session = await response.json();
+                if (session.error) {
+                    console.error(session.error);
+                    checkoutButton.disabled = false;
+                } else {
+                    const result = await stripe.redirectToCheckout({
+                        sessionId: session.id
+                    });
+
+                    if (result.error) {
+                        console.error(result.error);
+                        checkoutButton.disabled = false;
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                checkoutButton.disabled = false;
+            }
+        });
+    </script>
 </body>
 </html>
