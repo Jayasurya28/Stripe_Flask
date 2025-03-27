@@ -148,26 +148,30 @@
                 const response = await fetch('/pay', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                    },
+                        'Content-Type': 'application/json'
+                    }
                 });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Payment failed');
+                }
 
                 const session = await response.json();
                 if (session.error) {
-                    console.error(session.error);
-                    checkoutButton.disabled = false;
+                    throw new Error(session.error);
                 } else {
                     const result = await stripe.redirectToCheckout({
                         sessionId: session.id
                     });
 
                     if (result.error) {
-                        console.error(result.error);
-                        checkoutButton.disabled = false;
+                        throw new Error(result.error.message);
                     }
                 }
             } catch (error) {
                 console.error('Error:', error);
+                alert('Payment failed: ' + error.message);
                 checkoutButton.disabled = false;
             }
         });
