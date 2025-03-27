@@ -1,12 +1,19 @@
 import stripe
 from flask import Flask, render_template, request, jsonify
 import os
+from twilio.rest import Client
 
 app = Flask(__name__)
 from dotenv import load_dotenv
 load_dotenv()
 # Replace with your Stripe test keys
 stripe.api_key = os.getenv("STRIPE_API_KEY")
+
+# Initialize Twilio client
+twilio_client = Client(
+    os.getenv("TWILIO_ACCOUNT_SID"),
+    os.getenv("TWILIO_AUTH_TOKEN")
+)
 
 @app.route("/")
 def home():
@@ -41,6 +48,17 @@ def pay():
 
 @app.route("/success")
 def success():
+    try:
+        # Send SMS notification
+        message = twilio_client.messages.create(
+            from_=os.getenv("TWILIO_PHONE_NUMBER"),
+            to=os.getenv("CUSTOMER_PHONE_NUMBER"),
+            body="Thank you for your payment! Your transaction was successful."
+        )
+        print(f"SMS sent successfully! Message SID: {message.sid}")
+    except Exception as e:
+        print(f"Error sending SMS: {str(e)}")
+    
     return render_template("success.html")
 
 @app.route("/cancel")
