@@ -68,6 +68,12 @@ def pay():
         print(f"Generated Order ID: {order_id}")
         print(f"Customer Phone: {CUSTOMER_PHONE_NUMBER}")
         
+        # Create metadata for both session and payment intent
+        metadata = {
+            "customer_phone": CUSTOMER_PHONE_NUMBER,
+            "order_id": order_id
+        }
+        
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{
@@ -84,13 +90,14 @@ def pay():
             mode="payment",
             success_url=success_url,
             cancel_url=cancel_url,
-            metadata={
-                "customer_phone": CUSTOMER_PHONE_NUMBER,
-                "order_id": order_id
+            metadata=metadata,
+            payment_intent_data={
+                "metadata": metadata
             }
         )
         
         print(f"✅ Session created successfully! Session ID: {session.id}")
+        print(f"✅ Order ID: {order_id}")
         return jsonify({"id": session.id})
     except Exception as e:
         print(f"❌ Error creating session: {str(e)}")
@@ -113,15 +120,44 @@ def webhook():
         # Validate Stripe webhook signature
         event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
         print(f"\n✅ Webhook verified: {event['type']}")
+        print(f"Event ID: {event['id']}")
+        print(f"Event created: {event['created']}")
         
         # Handle successful payment events
         if event["type"] == "checkout.session.completed":
             print("\n=== Processing Checkout Completion ===")
             session = event["data"]["object"]
+            print(f"Session ID: {session['id']}")
+            print(f"Session metadata: {session.get('metadata', {})}")
+            
             order_id = session.get("metadata", {}).get("order_id")
             print(f"Order ID from metadata: {order_id}")
             
+            if not order_id:
+                print("❌ No order ID found in session metadata")
+                return jsonify({"error": "No order ID found"}), 400
+            
             # Send success SMS with order ID in requested format
+            message = f"Your order no: #{order_id} is confirmed and payment done successful"
+            print(f"Attempting to send SMS: {message}")
+            
+            success, result = send_sms(message)
+            if success:
+                print(f"✅ SMS sent successfully! SID: {result}")
+            else:
+                print(f"❌ Failed to send SMS: {result}")
+
+        elif event["type"] == "payment_intent.succeeded":
+            print("\n=== Processing Payment Intent Success ===")
+            payment_intent = event["data"]["object"]
+            print(f"Payment Intent ID: {payment_intent['id']}")
+            print(f"Payment Intent metadata: {payment_intent.get('metadata', {})}")
+            
+            order_id = payment_intent.get("metadata", {}).get("order_id")
+            if not order_id:
+                print("❌ No order ID found in payment intent metadata")
+                return jsonify({"error": "No order ID found"}), 400
+            
             message = f"Your order no: #{order_id} is confirmed and payment done successful"
             print(f"Attempting to send SMS: {message}")
             
@@ -156,11 +192,50 @@ def cancel():
 
 @app.route("/test-sms")
 def test_sms():
-    success, result = send_sms("This is a test SMS from your Flask application")
-    if success:
-        return jsonify({"status": "success", "message_sid": result})
-    else:
-        return jsonify({"error": result}), 400
+    try:
+        # First verify the phone numbers
+        print(f"Testing with: From={TWILIO_PHONE_NUMBER}, To={CUSTOMER_PHONE_NUMBER}")
+        
+        # Create Twilio client
+        twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        
+        # Check if the number is verified
+        verified_numbers = twilio_client.outgoing_caller_ids.list()
+        is_verified = any(number.phone_number == CUSTOMER_PHONE_NUMBER for number in verified_numbers)
+        
+        if not is_verified:
+            return jsonify({
+                "error": "Phone number is not verified",
+                "message": "Please verify your phone number in Twilio console first",
+                "number": CUSTOMER_PHONE_NUMBER
+            }), 400
+            
+        # Try to send the message
+        message = twilio_client.messages.create(
+            from_=TWILIO_PHONE_NUMBER,
+            to=CUSTOMER_PHONE_NUMBER,
+            body="This is a test SMS from your Flask application"
+        )
+        
+        return jsonify({
+            "status": "success",
+            "message": "SMS sent successfully!",
+            "details": {
+                "message_sid": message.sid,
+                "to": CUSTOMER_PHONE_NUMBER,
+                "from": TWILIO_PHONE_NUMBER,
+                "is_verified": True
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "details": {
+                "to": CUSTOMER_PHONE_NUMBER,
+                "from": TWILIO_PHONE_NUMBER
+            }
+        }), 400
 
 @app.route("/test-webhook", methods=["POST"])
 def test_webhook():
@@ -177,6 +252,78 @@ def test_webhook():
         print(f"❌ Test webhook SMS failed: {result}")
     
     return jsonify({"status": "success"}), 200
+
+@app.route("/test-sms-detailed")
+def test_sms_detailed():
+    """Endpoint to test SMS with detailed error reporting"""
+    try:
+        # First verify Twilio credentials
+        if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN:
+            return jsonify({
+                "status": "error",
+                "error": "Missing Twilio credentials",
+                "details": {
+                    "account_sid": "❌ Missing" if not TWILIO_ACCOUNT_SID else "✅ Present",
+                    "auth_token": "❌ Missing" if not TWILIO_AUTH_TOKEN else "✅ Present"
+                }
+            }), 400
+
+        if not TWILIO_PHONE_NUMBER or not CUSTOMER_PHONE_NUMBER:
+            return jsonify({
+                "status": "error",
+                "error": "Missing phone numbers",
+                "details": {
+                    "twilio_phone": "❌ Missing" if not TWILIO_PHONE_NUMBER else "✅ Present",
+                    "customer_phone": "❌ Missing" if not CUSTOMER_PHONE_NUMBER else "✅ Present"
+                }
+            }), 400
+
+        # Initialize Twilio client
+        twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        
+        # Verify account status
+        try:
+            account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+            account_status = account.status
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "error": "Failed to verify Twilio account",
+                "details": str(e)
+            }), 400
+
+        # Try to send test message
+        try:
+            message = twilio_client.messages.create(
+                from_=TWILIO_PHONE_NUMBER,
+                to=CUSTOMER_PHONE_NUMBER,
+                body="This is a test message from your Flask application. If you receive this, your SMS setup is working!"
+            )
+            
+            return jsonify({
+                "status": "success",
+                "message": "SMS sent successfully!",
+                "details": {
+                    "message_sid": message.sid,
+                    "account_status": account_status,
+                    "twilio_phone": TWILIO_PHONE_NUMBER,
+                    "customer_phone": CUSTOMER_PHONE_NUMBER
+                }
+            })
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "error": "Failed to send SMS",
+                "details": str(e),
+                "account_status": account_status
+            }), 400
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": "General error",
+            "details": str(e)
+        }), 500
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)
